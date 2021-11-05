@@ -15,7 +15,12 @@ const _ = Gettext.gettext;
 
 const ByteArray = imports.byteArray;
 
-const BPM = _("Battery protection mode");
+const BPM_PROFILES = {
+	"Home": [40, 70],
+	"Work": [70, 90],
+	"Travel": [95, 100],
+	"Disabled": [0, 100],
+};
 
 const NonClosingPopupSwitchMenuItem = GObject.registerClass(
 class NonClosingPopupSwitchMenuItem extends PopupMenu.PopupSwitchMenuItem {
@@ -34,24 +39,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			style_class: 'system-status-icon',
 		}));
 
-		let bpm = this._bpm = new PopupMenu.PopupSubMenuMenuItem(BPM); {
-			let mi;
-
-			mi = new PopupMenu.PopupMenuItem(_("Home (40%-70%)")); {
-				mi.connect('activate', () => this._set_bpm(40, 70));;
-			}; bpm.menu.addMenuItem(mi);
-
-			mi = new PopupMenu.PopupMenuItem(_("Work (70%-90%)")); {
-				mi.connect('activate', () => this._set_bpm(70, 90));
-			}; bpm.menu.addMenuItem(mi);
-
-			mi = new PopupMenu.PopupMenuItem(_("Travel (95%-100%)")); {
-				mi.connect('activate', () => this._set_bpm(95, 100))
-			}; bpm.menu.addMenuItem(mi);
-
-			mi = new PopupMenu.PopupMenuItem(_("Disabled (0%-100%)")); {
-				mi.connect('activate', () => this._set_bpm(0, 100));
-			}; bpm.menu.addMenuItem(mi);
+		let bpm = this._bpm = new PopupMenu.PopupSubMenuMenuItem(this._BPM = _("Battery protection mode")); {
+			for (let name in BPM_PROFILES) {
+				let [low, high] = BPM_PROFILES[name];
+				let mi = new PopupMenu.PopupMenuItem(`${_(name)} (${low}%-${high}%)`); {
+					mi.connect('activate', () => this._set_bpm(low, high));;
+				}; bpm.menu.addMenuItem(mi);
+			}
 
 			// TODO: Custom
 		}; this.menu.addMenuItem(bpm);
@@ -73,7 +67,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		if (low || high) file.replace_contents(`${low} ${high}`, null, false, 0, null);
 		[low, high] = ByteArray.toString(file.load_contents(null)[1]).split(' ').map(Number);
 
-		this._bpm.label.set_text(BPM + `: ${low}%-${high}%`);
+		this._bpm.label.set_text(this._BPM + `: ${low}%-${high}%`);
 	}
 
 	_set_fn_lock(state) {
