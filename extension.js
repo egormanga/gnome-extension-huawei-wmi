@@ -34,10 +34,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_init() {
 		super._init(0.0, _("Huawei WMI controls"));
 
-		this.add_child(new St.Icon({
-			gicon: Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`),
-			style_class: 'system-status-icon',
-		}));
+		let hbox = this._icon_box = new St.BoxLayout({style_class: 'panel-status-menu-box'}); {
+			let icon = this.icon = new St.Icon({
+				gicon: Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`),
+				style_class: 'system-status-icon',
+			});
+			hbox.add_child(icon);
+		}; this.add_child(hbox);
 
 		let bpm = this._bpm = new PopupMenu.PopupSubMenuMenuItem(this._BPM = _("Battery protection mode")); {
 			for (let name in BPM_PROFILES) {
