@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+	<schema id="org.gnome.shell.extensions.huawei-wmi" path="/org/gnome/shell/extensions/huawei-wmi/">
+		<key name="hwmi-config" type="as">
+			<default><![CDATA[['XF86Tools']]]></default>
+			<summary></summary>
+		</key>
+
+		<key name="hwmi-power-unlock" type="as">
+			<default><![CDATA[['XF86Battery']]]></default>
+			<summary></summary>
+		</key>
+	</schema>
+</schemalist>
