@@ -63,7 +63,12 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			power_unlock.connect('toggled', (item, state) => this._set_power_unlock(state));
 		}; this.menu.addMenuItem(power_unlock);
 
-		this.menu.connect('open-state-changed', () => this._bpm.activate());
+		this.connect('enter-event', () => this._update());
+		this.connect('button-press-event', () => this._update());
+		this.connect('key-press-event', () => this._update());
+		this.menu.connect('open-state-changed', () => {
+			if (this._bpm.sensitive) this._bpm.activate();
+		});
 
 		this._bind_keys();
 
@@ -94,6 +99,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		let old_state = this._power_unlock.state;
 		this._set_power_unlock();
 
+		if (!this._power_unlock.visible) return;
+
 		if (this._power_unlock.state === old_state) {
 			icon = 'battery-caution-symbolic';
 			text = _("Power Unlock\nunavailable on battery");
@@ -116,6 +123,12 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		Main.osdWindowManager.show(-1, Gio.icon_new_for_string(icon), text);
 	}
 
+	_update() {
+		this._set_bpm();
+		this._set_fn_lock();
+		this._set_power_unlock();
+	}
+
 	_set_bpm(low, high) {
 		let file = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
 
@@ -124,8 +137,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				file.replace_contents(`${low} ${high}`, null, false, 0, null);
 			} catch (e) {}
 
-		[low, high] = ByteArray.toString(file.load_contents(null)[1]).split(' ').map(Number);
-
+		try {
+			[low, high] = ByteArray.toString(file.load_contents(null)[1]).split(' ').map(Number);
+		} catch (e) {
+			this._bpm.setSensitive(false);
+			this._bpm.label.set_text(this._BPM);
+			return;
+		}
+		this._bpm.setSensitive(true);
 		this._bpm.label.set_text(this._BPM + `: ${low}%-${high}%`);
 	}
 
@@ -137,8 +156,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				file.replace_contents(Number(state).toString(), null, false, 0, null);
 			} catch (e) {}
 
-		state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
-
+		try {
+			state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
+		} catch (e) {
+			this._fn_lock.setSensitive(false);
+			return;
+		}
+		this._fn_lock.setSensitive(true);
 		this._fn_lock.setToggleState(state);
 	}
 
@@ -150,8 +174,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				file.replace_contents(Number(state).toString(), null, false, 0, null);
 			} catch (e) {}
 
-		state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
-
+		try {
+			state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
+		} catch (e) {
+			this._power_unlock.setSensitive(false);
+			return;
+		}
+		this._power_unlock.setSensitive(true);
 		this._power_unlock.setToggleState(state);
 	}
 });
