@@ -1,6 +1,6 @@
 // Huawei WMI controls
 
-const {St, Gio, Meta, Shell, GObject} = imports.gi;
+const {St, Gio, GLib, Meta, Shell, GObject} = imports.gi;
 
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
@@ -34,9 +34,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_init() {
 		super._init(0.0, _("Huawei WMI controls"));
 
+		this._fn_led = false;
+
+		this._icon_gear = Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`);
+		this._icon_gear_lock = Gio.icon_new_for_string(`${Me.path}/gear-lock-symbolic.svg`);
+
 		let hbox = this._icon_box = new St.BoxLayout({style_class: 'panel-status-menu-box'}); {
 			let icon = this.icon = new St.Icon({
-				gicon: Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`),
+				gicon: this._icon_gear,
 				style_class: 'system-status-icon',
 			});
 			hbox.add_child(icon);
@@ -70,15 +75,16 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			if (this._bpm.sensitive) this._bpm.activate();
 		});
 
+		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 1000, () => this._update_fn_led() || true);
+
 		this._bind_keys();
 
-		this._set_bpm(null, null);
-		this._set_fn_lock(null);
-		this._set_power_unlock(null);
+		this._update();
 	}
 
 	_destroy() {
 		this._unbind_keys();
+		if (this._fn_led_timeout !== null) GLib.timeout_remove(this._fn_led_timeout);
 	}
 
 	_bind_keys() {
@@ -127,6 +133,24 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._set_bpm();
 		this._set_fn_lock();
 		this._set_power_unlock();
+		this._update_fn_led();
+	}
+
+	_update_fn_led() {
+		let file = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/leds/platform::fn_led/brightness");
+
+		let on;
+		try {
+			on = Number(ByteArray.toString(file.load_contents(null)[1]));
+		} catch (e) {
+			return;
+		}
+
+		if (on != this._fn_led) {
+			this._fn_led = on;
+			this.icon.set_gicon(on?this._icon_gear_lock:this._icon_gear);
+			Main.osdWindowManager.show(-1, Gio.icon_new_for_string('preferences-desktop-keyboard-shortcuts-symbolic'), `Fn-Lock ${on?'on':'off'}`);
+		}
 	}
 
 	_set_bpm(low, high) {
@@ -206,5 +230,5 @@ function init(meta) {
 	return new Extension(meta.uuid);
 }
 
-// by Sdore, 2021-2022
+// by Sdore, 2021-22
 //   apps.sdore.me
