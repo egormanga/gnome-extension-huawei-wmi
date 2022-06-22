@@ -154,15 +154,17 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_set_bpm(low, high) {
-		let file = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
+		let file_sys = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
+		let file_def = Gio.File.new_for_path("/etc/default/huawei-wmi/charge_control_thresholds");
 
 		if (low || high)
 			try {
-				file.replace_contents(`${low} ${high}`, null, false, 0, null);
+				file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
+				file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
 			} catch (e) {}
 
 		try {
-			[low, high] = ByteArray.toString(file.load_contents(null)[1]).split(' ').map(Number);
+			[low, high] = ByteArray.toString(file_sys.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
 			this._bpm.setSensitive(false);
 			this._bpm.label.set_text(this._BPM);
