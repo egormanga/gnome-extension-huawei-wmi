@@ -9,6 +9,8 @@ const PopupMenu = imports.ui.popupMenu;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
+const UPower = imports.gi.UPowerGlib;
+
 const GETTEXT_DOMAIN = 'huawei-wmi';
 const Gettext = imports.gettext.domain(GETTEXT_DOMAIN);
 const _ = Gettext.gettext;
@@ -34,7 +36,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_init() {
 		super._init(0.0, _("Huawei WMI controls"));
 
+		this._battery_watching = false;
+		this._topping_off = false;
+		this._topping_off_checked = false;
 		this._fn_led = false;
+
+		this._file_sys = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
+		this._file_def = Gio.File.new_for_path("/etc/default/huawei-wmi/charge_control_thresholds");
 
 		this._icon_gear = Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`);
 		this._icon_gear_lock = Gio.icon_new_for_string(`${Me.path}/gear-lock-symbolic.svg`);
@@ -57,6 +65,12 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 			// TODO: Custom
 		}; this.menu.addMenuItem(bpm);
+
+		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+		let top_off = this._top_off = new NonClosingPopupSwitchMenuItem(_("Top off battery"), false); {
+			top_off.connect('toggled', (item, state) => this._set_top_off(state));
+		}; this.menu.addMenuItem(top_off);
 
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -134,6 +148,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._set_fn_lock();
 		this._set_power_unlock();
 		this._update_fn_led();
+		this._set_top_off();
 	}
 
 	_update_fn_led() {
@@ -154,17 +169,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_set_bpm(low, high) {
-		let file_sys = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
-		let file_def = Gio.File.new_for_path("/etc/default/huawei-wmi/charge_control_thresholds");
-
 		if (low || high)
 			try {
-				file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
-				file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
+				this._file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
+				this._file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
 			} catch (e) {}
 
 		try {
-			[low, high] = ByteArray.toString(file_sys.load_contents(null)[1]).split(' ').map(Number);
+			[low, high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
 			this._bpm.setSensitive(false);
 			this._bpm.label.set_text(this._BPM);
@@ -172,6 +184,98 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		}
 		this._bpm.setSensitive(true);
 		this._bpm.label.set_text(this._BPM + `: ${low}%-${high}%`);
+	}
+
+	_update_top_off() {
+		this._get_battery(proxy => {
+			let is_discharging = proxy.State === UPower.DeviceState.DISCHARGING
+			let is_fully_charged = proxy.State === UPower.DeviceState.FULLY_CHARGED
+			if (is_fully_charged) this._stop_top_off();
+			else if (is_discharging) this._stop_top_off();
+		})
+	}
+
+	_start_top_off() {
+		this._get_battery(proxy => {  // Connects watcher
+			this._battery_watching = proxy.connect(
+				'g-properties-changed',
+				this._update_top_off.bind(this)
+			);
+			try {
+				this._file_sys.replace_contents("0 100", null, false, 0, null);
+				this._topping_off = true;
+			} catch (e) {}
+		})
+	}
+
+	_stop_top_off() {
+		let def_low, def_high;
+		this._get_battery(proxy => {  // Disconnects watcher
+			proxy.disconnect(this._battery_watching);
+			try {	// Reinstates old BPM values
+				[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
+				this._file_sys.replace_contents(`${def_low} ${def_high}`, null, false, 0, null);
+				this._topping_off = false;
+			} catch (e) {}
+			})
+	}
+
+	_get_battery(callback) {
+		let menu = Main.panel.statusArea.aggregateMenu;
+		if (menu && menu._power) {
+			callback(menu._power._proxy, menu._power);
+		}
+	}
+
+	_set_top_off(state) {
+		let sys_low, sys_high, def_low, def_high;
+		
+		// Handle state change
+		if (state !== undefined)
+		try {
+			if (state && !this._topping_off) this._start_top_off();     // Top off switch gets switched on
+			else if (!state && this._topping_off) this._stop_top_off(); // Top off switch gets switched off
+		} catch (e) {
+			global.log(e)
+		}
+
+		// Check if the button to enable battery top-off should be available and
+		// set toggle state depending on the actual values set in /sys and /etc
+		try {
+			[sys_low, sys_high] = ByteArray.toString(this._file_sys.load_contents(null)[1]).split(' ').map(Number);
+			[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
+
+			let is_charging;
+			this._get_battery(proxy => { is_charging = proxy.State === UPower.DeviceState.CHARGING });
+			// If BPM == off -> unavailable
+			if (def_low == 0 && def_high == 100) {
+				this._top_off.setToggleState(false);
+				this._top_off.setSensitive(false);
+			}
+            // If BPM IS on AND device is charging -> available
+			else if ((def_low != 0 || def_high != 100) && is_charging ) {
+				this._top_off.setSensitive(true);
+				// Check if top-off is active and set button state 
+				let top_is_active = ((def_low != 0 && def_high != 100) && (sys_low == 0 && sys_high == 100));
+				if (top_is_active && is_charging) {
+					this._top_off.setToggleState(true);
+					if (top_is_active && !this._topping_off) this._start_top_off(); // Reconnects watcher if extension has been restarted without reinstating BPM
+				} // If top is active and charger is not connected -> reinstate old BPM
+				else if (top_is_active && !is_charging) {
+					this._stop_top_off();
+					this._top_off.setToggleState(false);
+					this._top_off.setSensitive(false);
+				}
+				} else { // Reinstates old BPM in case of unclean watcher exit and handles edge cases
+					if (def_low != sys_low || def_high != sys_high) this._stop_top_off();
+					this._top_off.setToggleState(false);
+					this._top_off.setSensitive(false);
+				}
+		} catch (e) {
+			global.log(e)
+			this._top_off.setSensitive(false);
+			return;
+		}
 	}
 
 	_set_fn_lock(state) {
@@ -234,3 +338,4 @@ function init(meta) {
 
 // by Sdore, 2021-22
 //   apps.sdore.me
+
