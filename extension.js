@@ -265,7 +265,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 					this._stop_top_off();
 					this._top_off.setToggleState(false);
 					this._top_off.setSensitive(false);
-				}
+				} 
 				} else { // Reinstates old BPM in case of unclean watcher exit and handles edge cases
 					if (def_low != sys_low || def_high != sys_high) this._stop_top_off();
 					this._top_off.setToggleState(false);
