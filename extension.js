@@ -38,7 +38,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		this._battery_watching = false;
 		this._topping_off = false;
-		this._topping_off_checked = false;
 		this._fn_led = false;
 
 		this._file_sys = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
