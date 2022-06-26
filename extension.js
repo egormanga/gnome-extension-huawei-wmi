@@ -168,11 +168,12 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_set_bpm(low, high) {
-		if (low || high)
+		if (low || high) {
 			try {
 				this._file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
 				this._file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
 			} catch (e) {}
+		}
 
 		try {
 			[low, high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
@@ -187,8 +188,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_update_top_off() {
 		this._get_battery(proxy => {
-			let is_discharging = proxy.State === UPower.DeviceState.DISCHARGING
-			let is_fully_charged = proxy.State === UPower.DeviceState.FULLY_CHARGED
+			let is_discharging = (proxy.State === UPower.DeviceState.DISCHARGING)
+			let is_fully_charged = (proxy.State === UPower.DeviceState.FULLY_CHARGED)
 			if (is_fully_charged) this._stop_top_off();
 			else if (is_discharging) this._stop_top_off();
 		})
@@ -196,10 +197,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_start_top_off() {
 		this._get_battery(proxy => {  // Connects watcher
-			this._battery_watching = proxy.connect(
-				'g-properties-changed',
-				this._update_top_off.bind(this)
-			);
+			this._battery_watching = proxy.connect('g-properties-changed', this._update_top_off.bind(this));
 			try {
 				this._file_sys.replace_contents("0 100", null, false, 0, null);
 				this._topping_off = true;
@@ -211,12 +209,12 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		let def_low, def_high;
 		this._get_battery(proxy => {  // Disconnects watcher
 			proxy.disconnect(this._battery_watching);
-			try {	// Reinstates old BPM values
+			try {  // Reinstates old BPM values
 				[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
 				this._file_sys.replace_contents(`${def_low} ${def_high}`, null, false, 0, null);
 				this._topping_off = false;
 			} catch (e) {}
-			})
+		})
 	}
 
 	_get_battery(callback) {
@@ -229,13 +227,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_set_top_off(state) {
 		let sys_low, sys_high, def_low, def_high;
 		let is_charging;
-		this._get_battery(proxy => { is_charging = proxy.State === UPower.DeviceState.CHARGING });
-		
+		this._get_battery(proxy => { is_charging = (proxy.State === UPower.DeviceState.CHARGING) });
+
 		// Handle state change
 		if (state !== undefined)
 		try {
 			if (state && !this._topping_off && is_charging) this._start_top_off();  // Top off switch gets switched on
-			else if (!state && this._topping_off) this._stop_top_off(); 		    // Top off switch gets switched off
+			else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
 		} catch (e) {
 			global.log(e)
 		}
@@ -254,18 +252,18 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
             // If BPM IS on AND device is charging -> available
 			else if ((def_low != 0 || def_high != 100) && is_charging ) {
 				this._top_off.setSensitive(true);
-				// Check if top-off is active and set button state 
+				// Check if top-off is active and set button state
 				let top_is_active = ((def_low != 0 && def_high != 100) && (sys_low == 0 && sys_high == 100));
 				if (top_is_active && is_charging) {
 					this._top_off.setToggleState(true);
-					if (top_is_active && !this._topping_off) this._start_top_off(); // Reconnects watcher if extension has been restarted without reinstating BPM
-				} // If top is active and charger is not connected -> reinstate old BPM
+					if (top_is_active && !this._topping_off) this._start_top_off();  // Reconnects watcher if extension has been restarted without reinstating BPM
+				}  // If top is active and charger is not connected -> reinstate old BPM
 				else if (top_is_active && !is_charging) {
 					this._stop_top_off();
 					this._top_off.setToggleState(false);
 					this._top_off.setSensitive(false);
-				} 
-				} else { // Reinstates old BPM in case of unclean watcher exit and handles edge cases
+				}
+				} else {  // Reinstates old BPM in case of unclean watcher exit and handles edge cases
 					if (def_low != sys_low || def_high != sys_high) this._stop_top_off();
 					this._top_off.setToggleState(false);
 					this._top_off.setSensitive(false);
@@ -337,4 +335,3 @@ function init(meta) {
 
 // by Sdore, 2021-22
 //   apps.sdore.me
-
