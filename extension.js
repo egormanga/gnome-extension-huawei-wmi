@@ -228,12 +228,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_set_top_off(state) {
 		let sys_low, sys_high, def_low, def_high;
+		let is_charging;
+		this._get_battery(proxy => { is_charging = proxy.State === UPower.DeviceState.CHARGING });
 		
 		// Handle state change
 		if (state !== undefined)
 		try {
-			if (state && !this._topping_off) this._start_top_off();     // Top off switch gets switched on
-			else if (!state && this._topping_off) this._stop_top_off(); // Top off switch gets switched off
+			if (state && !this._topping_off && is_charging) this._start_top_off();  // Top off switch gets switched on
+			else if (!state && this._topping_off) this._stop_top_off(); 		    // Top off switch gets switched off
 		} catch (e) {
 			global.log(e)
 		}
@@ -244,8 +246,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			[sys_low, sys_high] = ByteArray.toString(this._file_sys.load_contents(null)[1]).split(' ').map(Number);
 			[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
 
-			let is_charging;
-			this._get_battery(proxy => { is_charging = proxy.State === UPower.DeviceState.CHARGING });
 			// If BPM == off -> unavailable
 			if (def_low == 0 && def_high == 100) {
 				this._top_off.setToggleState(false);
