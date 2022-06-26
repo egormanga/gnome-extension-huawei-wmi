@@ -40,8 +40,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._topping_off = false;
 		this._fn_led = false;
 
-		this._file_sys = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/charge_control_thresholds");
-		this._file_def = Gio.File.new_for_path("/etc/default/huawei-wmi/charge_control_thresholds");
+		this._file_sys_str = "/sys/devices/platform/huawei-wmi/charge_control_thresholds";
+		this._file_def_str = "/etc/default/huawei-wmi/charge_control_thresholds";
 
 		this._icon_gear = Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`);
 		this._icon_gear_lock = Gio.icon_new_for_string(`${Me.path}/gear-lock-symbolic.svg`);
@@ -168,15 +168,17 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_set_bpm(low, high) {
-		if (low || high) {
+		let _file_sys = Gio.File.new_for_path(this._file_sys_str);
+		let _file_def = Gio.File.new_for_path(this._file_def_str);
+
+		if (low || high)
 			try {
-				this._file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
-				this._file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
+				_file_sys.replace_contents(`${low} ${high}`, null, false, 0, null);
+				_file_def.replace_contents(`${low} ${high}`, null, false, 0, null);
 			} catch (e) {}
-		}
 
 		try {
-			[low, high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
+			[low, high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
 			this._bpm.setSensitive(false);
 			this._bpm.label.set_text(this._BPM);
@@ -196,25 +198,30 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_start_top_off() {
+		let _file_sys = Gio.File.new_for_path(this._file_sys_str);
+
 		this._get_battery(proxy => {  // Connects watcher
 			this._battery_watching = proxy.connect('g-properties-changed', this._update_top_off.bind(this));
 			try {
-				this._file_sys.replace_contents("0 100", null, false, 0, null);
+				_file_sys.replace_contents("0 100", null, false, 0, null);
 				this._topping_off = true;
 			} catch (e) {}
 		})
 	}
 
 	_stop_top_off() {
+		let _file_sys = Gio.File.new_for_path(this._file_sys_str);
+		let _file_def = Gio.File.new_for_path(this._file_def_str);
+
 		let def_low, def_high;
 		this._get_battery(proxy => {  // Disconnects watcher
 			proxy.disconnect(this._battery_watching);
 			try {  // Reinstates old BPM values
-				[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
-				this._file_sys.replace_contents(`${def_low} ${def_high}`, null, false, 0, null);
+				[def_low, def_high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
+				_file_sys.replace_contents(`${def_low} ${def_high}`, null, false, 0, null);
 				this._topping_off = false;
 			} catch (e) {}
-		})
+		});
 	}
 
 	_get_battery(callback) {
@@ -225,6 +232,9 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_set_top_off(state) {
+		let _file_sys = Gio.File.new_for_path(this._file_sys_str);
+		let _file_def = Gio.File.new_for_path(this._file_def_str);
+
 		let sys_low, sys_high, def_low, def_high;
 		let is_charging;
 		this._get_battery(proxy => { is_charging = (proxy.State === UPower.DeviceState.CHARGING) });
@@ -241,15 +251,15 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		// Check if the button to enable battery top-off should be available and
 		// set toggle state depending on the actual values set in /sys and /etc
 		try {
-			[sys_low, sys_high] = ByteArray.toString(this._file_sys.load_contents(null)[1]).split(' ').map(Number);
-			[def_low, def_high] = ByteArray.toString(this._file_def.load_contents(null)[1]).split(' ').map(Number);
+			[sys_low, sys_high] = ByteArray.toString(_file_sys.load_contents(null)[1]).split(' ').map(Number);
+			[def_low, def_high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
 
 			// If BPM == off -> unavailable
 			if (def_low == 0 && def_high == 100) {
 				this._top_off.setToggleState(false);
 				this._top_off.setSensitive(false);
 			}
-            // If BPM IS on AND device is charging -> available
+			// If BPM IS on AND device is charging -> available
 			else if ((def_low != 0 || def_high != 100) && is_charging ) {
 				this._top_off.setSensitive(true);
 				// Check if top-off is active and set button state
