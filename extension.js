@@ -236,17 +236,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		let _file_def = Gio.File.new_for_path(this._file_def_str);
 
 		let sys_low, sys_high, def_low, def_high;
-		let is_charging;
-		this._get_battery(proxy => { is_charging = (proxy.State === UPower.DeviceState.CHARGING) });
-
-		// Handle state change
-		if (state !== undefined)
-		try {
-			if (state && !this._topping_off && is_charging) this._start_top_off();  // Top off switch gets switched on
-			else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
-		} catch (e) {
-			global.log(e)
-		}
+		let is_discharging;
+		this._get_battery(proxy => { is_discharging = (proxy.State === UPower.DeviceState.DISCHARGING) });
 
 		// Check if the button to enable battery top-off should be available and
 		// set toggle state depending on the actual values set in /sys and /etc
@@ -254,25 +245,21 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			[sys_low, sys_high] = ByteArray.toString(_file_sys.load_contents(null)[1]).split(' ').map(Number);
 			[def_low, def_high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
 
-			// If BPM == off -> unavailable
+			// If BPM == off -> Button = Unavailable and Off
 			if (def_low == 0 && def_high == 100) {
 				this._top_off.setToggleState(false);
 				this._top_off.setSensitive(false);
 			}
-			// If BPM IS on AND device is charging -> available
-			else if ((def_low != 0 || def_high != 100) && is_charging ) {
+			// If BPM is on and device is not discharging -> Button = Available
+			else if ((def_low != 0 || def_high != 100) && !is_discharging ) {
 				this._top_off.setSensitive(true);
-				// Check if top-off is active and set button state
+				// Check if top-off is active -> Button = On
 				let top_is_active = ((def_low != 0 && def_high != 100) && (sys_low == 0 && sys_high == 100));
-				if (top_is_active && is_charging) {
+				if (top_is_active) {
 					this._top_off.setToggleState(true);
 					if (top_is_active && !this._topping_off) this._start_top_off();  // Reconnects watcher if extension has been restarted without reinstating BPM
-				}  // If top is active and charger is not connected -> reinstate old BPM
-				else if (top_is_active && !is_charging) {
-					this._stop_top_off();
-					this._top_off.setToggleState(false);
-					this._top_off.setSensitive(false);
-				}
+				}  // If top is not active -> Button = Off
+				else this._top_off.setToggleState(false);
 				} else {  // Reinstates old BPM in case of unclean watcher exit and handles edge cases
 					if (def_low != sys_low || def_high != sys_high) this._stop_top_off();
 					this._top_off.setToggleState(false);
@@ -282,6 +269,15 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			global.log(e)
 			this._top_off.setSensitive(false);
 			return;
+		}
+
+		// Handle state change
+		if (state !== undefined)
+		try {
+			if (state && !this._topping_off) this._start_top_off();  // Top off switch gets switched on
+			else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
+		} catch (e) {
+			global.log(e)
 		}
 	}
 
