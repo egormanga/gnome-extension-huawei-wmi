@@ -276,6 +276,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		try {
 			if (state && !this._topping_off) this._start_top_off();  // Top off switch gets switched on
 			else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
+			this._set_top_off();
 		} catch (e) {
 			global.log(e)
 		}
