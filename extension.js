@@ -258,8 +258,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				if (top_is_active) {
 					this._top_off.setToggleState(true);
 					if (top_is_active && !this._topping_off) this._start_top_off();  // Reconnects watcher if extension has been restarted without reinstating BPM
-				}  // If top is not active -> Button = Off
-				else this._top_off.setToggleState(false);
+				} else this._top_off.setToggleState(false);  // If top is not active -> Button = Off
 				} else {  // Reinstates old BPM in case of unclean watcher exit and handles edge cases
 					if (def_low != sys_low || def_high != sys_high) this._stop_top_off();
 					this._top_off.setToggleState(false);
@@ -273,13 +272,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		// Handle state change
 		if (state !== undefined)
-		try {
-			if (state && !this._topping_off) this._start_top_off();  // Top off switch gets switched on
-			else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
-			this._set_top_off();
-		} catch (e) {
-			global.log(e)
-		}
+			try {
+				if (state && !this._topping_off) this._start_top_off();  // Top off switch gets switched on
+				else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
+				this._set_top_off();
+			} catch (e) {
+				global.log(e)
+			}
 	}
 
 	_set_fn_lock(state) {
