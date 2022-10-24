@@ -91,7 +91,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		this._fullscreen_changed_s = Display.connect('in-fullscreen-changed', this._fullscreen_changed.bind(this));
 
-		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 1000, () => this._update_fn_led() || true);
+		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => this._update_fn_led() || true);
 
 		this._bind_keys();
 
