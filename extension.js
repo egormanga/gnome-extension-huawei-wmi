@@ -66,8 +66,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			// TODO: Custom
 		}; this.menu.addMenuItem(bpm);
 
-		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
 		let top_off = this._top_off = new NonClosingPopupSwitchMenuItem(_("Top off battery"), false); {
 			top_off.connect('toggled', (item, state) => this._set_top_off(state));
 		}; this.menu.addMenuItem(top_off);
