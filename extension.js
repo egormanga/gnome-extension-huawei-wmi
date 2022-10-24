@@ -15,6 +15,8 @@ const _ = Gettext.gettext;
 
 const ByteArray = imports.byteArray;
 
+const Display = global.display;
+
 const BPM_PROFILES = {
 	"Home": [40, 70],
 	"Work": [70, 90],
@@ -75,6 +77,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			if (this._bpm.sensitive) this._bpm.activate();
 		});
 
+		this._fullscreen_changed_s = Display.connect('in-fullscreen-changed', this._fullscreen_changed.bind(this));
+
 		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 1000, () => this._update_fn_led() || true);
 
 		this._bind_keys();
@@ -84,6 +88,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_destroy() {
 		this._unbind_keys();
+		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
 		if (this._fn_led_timeout !== null) GLib.timeout_remove(this._fn_led_timeout);
 	}
 
@@ -97,6 +102,23 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_unbind_keys() {
 		Main.wm.removeKeybinding('hwmi-config');
 		Main.wm.removeKeybinding('hwmi-power-unlock');
+	}
+
+	_fullscreen_changed() {
+		let file = Gio.File.new_for_path("/sys/devices/platform/huawei-wmi/kbdlight_timeout");
+
+		try {
+			if (Main.layoutManager.primaryMonitor.inFullscreen) {
+				this._fullscreen_changed_timeout = Number(ByteArray.toString(file.load_contents(null)[1]));
+				file.replace_contents("1", null, false, 0, null);
+			} else {
+				file.replace_contents(`${this._fullscreen_changed_timeout || 300}`, null, false, 0, null);
+			}
+		} catch (e) {
+			Display.disconnect(this._fullscreen_changed_s);
+			this._fullscreen_changed_s = null;
+			return;
+		}
 	}
 
 	_key_power_unlock() {
