@@ -1,6 +1,7 @@
 // Huawei WMI controls
 
-const {St, Gio, GLib, Meta, Shell, GObject} = imports.gi;
+const { St, Gio, GLib, Meta, Shell, GObject } = imports.gi;
+const UPower = imports.gi.UPowerGlib;
 
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
@@ -8,8 +9,6 @@ const PopupMenu = imports.ui.popupMenu;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
-
-const UPower = imports.gi.UPowerGlib;
 
 const GETTEXT_DOMAIN = 'huawei-wmi';
 const Gettext = imports.gettext.domain(GETTEXT_DOMAIN);
