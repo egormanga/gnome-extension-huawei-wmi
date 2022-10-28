@@ -119,7 +119,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		try {
 			if (Main.layoutManager.primaryMonitor.inFullscreen) {
-				this._fullscreen_changed_timeout = Number(ByteArray.toString(file.load_contents(null)[1]));
+				let t = Number(ByteArray.toString(file.load_contents(null)[1]));
+				if (t != 1) this._fullscreen_changed_timeout = t;
 				file.replace_contents("1", null, false, 0, null);
 			} else {
 				file.replace_contents(`${this._fullscreen_changed_timeout || 300}`, null, false, 0, null);
