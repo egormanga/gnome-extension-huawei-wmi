@@ -1,18 +1,18 @@
 // Huawei WMI controls
 
-const { St, Gio, GLib, Meta, Shell, GObject } = imports.gi;
-const UPower = imports.gi.UPowerGlib;
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
+import GObject from 'gi://GObject';
+import UPower from 'gi://UPowerGlib';
 
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-
-const GETTEXT_DOMAIN = 'huawei-wmi';
-const Gettext = imports.gettext.domain(GETTEXT_DOMAIN);
-const _ = Gettext.gettext;
+import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const ByteArray = imports.byteArray;
 
@@ -34,7 +34,7 @@ class NonClosingPopupSwitchMenuItem extends PopupMenu.PopupSwitchMenuItem {
 
 const HuaweiWmiIndicator = GObject.registerClass(
 class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system battery menu?
-	_init() {
+	_init(path, settings) {
 		super._init(0.0, _("Huawei WMI controls"));
 
 		this._battery_watching = false;
@@ -44,8 +44,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._file_sys_str = "/sys/devices/platform/huawei-wmi/charge_control_thresholds";
 		this._file_def_str = "/etc/default/huawei-wmi/charge_control_thresholds";
 
-		this._icon_gear = Gio.icon_new_for_string(`${Me.path}/gear-symbolic.svg`);
-		this._icon_gear_lock = Gio.icon_new_for_string(`${Me.path}/gear-lock-symbolic.svg`);
+		this._icon_gear = Gio.icon_new_for_string(`${path}/gear-symbolic.svg`);
+		this._icon_gear_lock = Gio.icon_new_for_string(`${path}/gear-lock-symbolic.svg`);
 
 		let hbox = this._icon_box = new St.BoxLayout({style_class: 'panel-status-menu-box'}); {
 			let icon = this.icon = new St.Icon({
@@ -91,7 +91,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => this._update_fn_led() || true);
 
-		this._bind_keys();
+		this._bind_keys(settings);
 
 		this._update();
 	}
@@ -102,9 +102,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		if (this._fn_led_timeout !== null) GLib.timeout_remove(this._fn_led_timeout);
 	}
 
-	_bind_keys() {
-		let settings = ExtensionUtils.getSettings("org.gnome.shell.extensions.huawei-wmi");
-
+	_bind_keys(settings) {
 		Main.wm.addKeybinding('hwmi-config', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this.menu.toggle.bind(this.menu));
 		Main.wm.addKeybinding('hwmi-power-unlock', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._key_power_unlock.bind(this));
 	}
@@ -282,7 +280,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				this._top_off.setSensitive(false);
 			}
 		} catch (e) {
-			global.log(e)
+			log(e)
 			this._top_off.setSensitive(false);
 			return;
 		}
@@ -294,7 +292,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				else if (!state && this._topping_off) this._stop_top_off();  // Top off switch gets switched off
 				this._set_top_off();
 			} catch (e) {
-				global.log(e)
+				log(e)
 			}
 	}
 
@@ -335,15 +333,10 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 });
 
-class Extension {
-	constructor(uuid) {
-		this._uuid = uuid;
-		ExtensionUtils.initTranslations(GETTEXT_DOMAIN);
-	}
-
+export default class HuaweiWmiExtension extends Extension {
 	enable() {
-		this._indicator = new HuaweiWmiIndicator();
-		Main.panel.addToStatusArea(this._uuid, this._indicator);
+		this._indicator = new HuaweiWmiIndicator(this.path, this.getSettings());
+		Main.panel.addToStatusArea(this.uuid, this._indicator);
 	}
 
 	disable() {
@@ -353,8 +346,8 @@ class Extension {
 }
 
 function init(meta) {
-	return new Extension(meta.uuid);
+	return new HuaweiWmiExtension(meta.uuid);
 }
 
-// by Sdore, 2021-22
+// by Sdore, 2021-23
 //   apps.sdore.me
