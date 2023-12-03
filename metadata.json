@@ -2,7 +2,7 @@
 	"uuid": "huawei-wmi@apps.sdore.me",
 	"name": "Huawei WMI controls",
 	"description": "Control various Huawei and Honor laptops WMI functions, such as battery protection, Fn-lock, power unlock and keyboard backlight.",
-	"version": 12,
+	"version": 13,
 	"shell-version": ["45"],
 	"url": "https://apps.sdore.me/gnome-extension-huawei-wmi",
 	"gettext-domain": "huawei-wmi",

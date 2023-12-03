@@ -14,8 +14,6 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const ByteArray = imports.byteArray;
-
 const Display = global.display;
 
 const BPM_PROFILES = {
@@ -117,7 +115,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		try {
 			if (Main.layoutManager.primaryMonitor.inFullscreen) {
-				let t = Number(ByteArray.toString(file.load_contents(null)[1]));
+				let t = Number(new TextDecoder().decode(file.load_contents(null)[1]));
 				if (t != 1) this._fullscreen_changed_timeout = t;
 				file.replace_contents("1", null, false, 0, null);
 			} else {
@@ -173,7 +171,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		let on;
 		try {
-			on = Number(ByteArray.toString(file.load_contents(null)[1]));
+			on = Number(new TextDecoder().decode(file.load_contents(null)[1]));
 		} catch (e) {
 			return;
 		}
@@ -196,7 +194,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			} catch (e) {}
 
 		try {
-			[low, high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
+			[low, high] = new TextDecoder().decode(_file_def.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
 			this._bpm.setSensitive(false);
 			this._bpm.label.set_text(this._BPM);
@@ -235,7 +233,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._get_battery(proxy => {  // Disconnects watcher
 			proxy.disconnect(this._battery_watching);
 			try {  // Reinstates old BPM values
-				[def_low, def_high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
+				[def_low, def_high] = new TextDecoder().decode(_file_def.load_contents(null)[1]).split(' ').map(Number);
 				_file_sys.replace_contents(`${def_low} ${def_high}`, null, false, 0, null);
 				this._topping_off = false;
 			} catch (e) {}
@@ -260,8 +258,8 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		// Check if the button to enable battery top-off should be available and
 		// set toggle state depending on the actual values set in /sys and /etc
 		try {
-			[sys_low, sys_high] = ByteArray.toString(_file_sys.load_contents(null)[1]).split(' ').map(Number);
-			[def_low, def_high] = ByteArray.toString(_file_def.load_contents(null)[1]).split(' ').map(Number);
+			[sys_low, sys_high] = new TextDecoder().decode(_file_sys.load_contents(null)[1]).split(' ').map(Number);
+			[def_low, def_high] = new TextDecoder().decode(_file_def.load_contents(null)[1]).split(' ').map(Number);
 
 			if (def_low == 0 && def_high == 100) {  // If BPM == off -> Button = Unavailable and Off
 				this._top_off.setToggleState(false);
@@ -305,7 +303,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			} catch (e) {}
 
 		try {
-			state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
+			state = Boolean(Number(new TextDecoder().decode(file.load_contents(null)[1])));
 		} catch (e) {
 			this._fn_lock.setSensitive(false);
 			return;
@@ -323,7 +321,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			} catch (e) {}
 
 		try {
-			state = Boolean(Number(ByteArray.toString(file.load_contents(null)[1])));
+			state = Boolean(Number(new TextDecoder().decode(file.load_contents(null)[1])));
 		} catch (e) {
 			this._power_unlock.setSensitive(false);
 			return;
@@ -343,10 +341,6 @@ export default class HuaweiWmiExtension extends Extension {
 		this._indicator.destroy();
 		this._indicator = null;
 	}
-}
-
-function init(meta) {
-	return new HuaweiWmiExtension(meta.uuid);
 }
 
 // by Sdore, 2021-23
