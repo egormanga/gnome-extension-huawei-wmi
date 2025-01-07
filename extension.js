@@ -2,6 +2,7 @@
 
 import St from 'gi://St';
 import Gio from 'gi://Gio';
+import Cogl from 'gi://Cogl';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -97,7 +98,9 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_destroy() {
 		this._unbind_keys();
 		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
-		if (this._fn_led_timeout !== null) GLib.timeout_remove(this._fn_led_timeout);
+		if (this._fn_led_timeout !== null) GLib.Source.remove(this._fn_led_timeout);
+		if (this._camera_hint_timeout !== null) GLib.Source.remove(this._camera_hint_timeout);
+		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
 	}
 
 	_bind_keys(settings) {
@@ -164,10 +167,34 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_camera_ejected() {
 		Main.osdWindowManager.show(-1, Gio.icon_new_for_string('camera-photo-symbolic'), "Camera ejected");
+
+		if (this._camera_hint_timeout === null) {
+			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
+			Main.panel._centerBox.set_background_color(Cogl.color_from_string('#00AAD0')[1]);
+
+			this._camera_hint_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+				this._camera_hint_timeout = null;
+
+				if (this._camera_hint_prev_color !== null) {
+					Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+					this._camera_hint_prev_color = null;
+				}
+			});
+		}
 	}
 
 	_camera_inserted() {
 		Main.osdWindowManager.show(-1, Gio.icon_new_for_string('camera-hardware-disabled-symbolic'), "Camera inserted");
+
+		if (this._camera_hint_timeout !== null) {
+			GLib.Source.remove(this._camera_hint_timeout);
+			this._camera_hint_timeout = null;
+		}
+
+		if (this._camera_hint_prev_color !== null) {
+			Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+			this._camera_hint_prev_color = null;
+		}
 	}
 
 	_update() {
