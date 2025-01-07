@@ -2,12 +2,22 @@
 <schemalist>
 	<schema id="org.gnome.shell.extensions.huawei-wmi" path="/org/gnome/shell/extensions/huawei-wmi/">
 		<key name="hwmi-config" type="as">
-			<default><![CDATA[['XF86Tools']]]></default>
+			<default><![CDATA[['XF86ControlPanel']]]></default>
 			<summary></summary>
 		</key>
 
 		<key name="hwmi-power-unlock" type="as">
 			<default><![CDATA[['XF86Battery']]]></default>
+			<summary></summary>
+		</key>
+
+		<key name="hwmi-camera-ejected" type="as">
+			<default><![CDATA[['XF86CameraAccessEnable']]]></default>
+			<summary></summary>
+		</key>
+
+		<key name="hwmi-camera-inserted" type="as">
+			<default><![CDATA[['XF86CameraAccessDisable']]]></default>
 			<summary></summary>
 		</key>
 	</schema>

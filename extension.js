@@ -103,11 +103,15 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_bind_keys(settings) {
 		Main.wm.addKeybinding('hwmi-config', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this.menu.toggle.bind(this.menu));
 		Main.wm.addKeybinding('hwmi-power-unlock', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._key_power_unlock.bind(this));
+		Main.wm.addKeybinding('hwmi-camera-ejected', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._camera_ejected.bind(this));
+		Main.wm.addKeybinding('hwmi-camera-inserted', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._camera_inserted.bind(this));
 	}
 
 	_unbind_keys() {
 		Main.wm.removeKeybinding('hwmi-config');
 		Main.wm.removeKeybinding('hwmi-power-unlock');
+		Main.wm.removeKeybinding('hwmi-camera-ejected');
+		Main.wm.removeKeybinding('hwmi-camera-inserted');
 	}
 
 	_fullscreen_changed() {
@@ -156,6 +160,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		}
 
 		Main.osdWindowManager.show(-1, Gio.icon_new_for_string(icon), text);
+	}
+
+	_camera_ejected() {
+		Main.osdWindowManager.show(-1, Gio.icon_new_for_string('camera-photo-symbolic'), "Camera ejected");
+	}
+
+	_camera_inserted() {
+		Main.osdWindowManager.show(-1, Gio.icon_new_for_string('camera-hardware-disabled-symbolic'), "Camera inserted");
 	}
 
 	_update() {
