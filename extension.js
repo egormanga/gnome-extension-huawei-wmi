@@ -95,12 +95,15 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._update();
 	}
 
-	_destroy() {
+	destroy() {
 		this._unbind_keys();
+
 		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
 		if (this._fn_led_timeout !== null) GLib.Source.remove(this._fn_led_timeout);
 		if (this._camera_hint_timeout !== null) GLib.Source.remove(this._camera_hint_timeout);
 		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+
+		super.destroy();
 	}
 
 	_bind_keys(settings) {
