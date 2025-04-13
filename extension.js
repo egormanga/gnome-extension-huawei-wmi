@@ -90,6 +90,9 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => this._update_fn_led() || true);
 
+		this._camera_hint_timeout = null;
+		this._camera_hint_prev_color = null;
+
 		this._bind_keys(settings);
 
 		this._update();
@@ -236,7 +239,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			} catch (e) {}
 
 		try {
-			[low, high] = new TextDecoder().decode(_file_def.load_contents(null)[1]).split(' ').map(Number);
+			[low, high] = new TextDecoder().decode(_file_sys.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
 			this._bpm.setSensitive(false);
 			this._bpm.label.set_text(this._BPM);
