@@ -2,7 +2,7 @@
 
 import St from 'gi://St';
 import Gio from 'gi://Gio';
-import Cogl from 'gi://Cogl';
+import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -175,7 +175,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		if (this._camera_hint_timeout === null) {
 			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
-			Main.panel._centerBox.set_background_color(Cogl.color_from_string('#00AAD0')[1]);
+			Main.panel._centerBox.set_background_color(Clutter.Color.from_string('#00AAD0')[1]);
 
 			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
 				this._camera_hint_timeout = null;
