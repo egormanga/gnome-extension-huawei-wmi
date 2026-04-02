@@ -183,6 +183,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 					Main.panel._centerBox.set_style(null);
 					this._camera_hint_prev_color = null;
 				}
+				return GLib.SOURCE_REMOVE;
 			});
 		}
 	}
