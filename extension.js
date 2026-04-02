@@ -2,7 +2,6 @@
 
 import St from 'gi://St';
 import Gio from 'gi://Gio';
-import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -105,7 +104,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
 		if (this._fn_led_timeout !== null) GLib.Source.remove(this._fn_led_timeout);
 		if (this._camera_hint_timeout !== null) GLib.Source.remove(this._camera_hint_timeout);
-		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_style(null);
 
 		super.destroy();
 	}
@@ -175,13 +174,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		if (this._camera_hint_timeout === null) {
 			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
-			Main.panel._centerBox.set_background_color(Clutter.Color.from_string('#00AAD0')[1]);
+			Main.panel._centerBox.set_style('background-color: #00AAD0;');
 
 			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
 				this._camera_hint_timeout = null;
 
 				if (this._camera_hint_prev_color !== null) {
-					Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+					Main.panel._centerBox.set_style(null);
 					this._camera_hint_prev_color = null;
 				}
 			});
@@ -197,7 +196,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		}
 
 		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+			Main.panel._centerBox.set_style(null);
 			this._camera_hint_prev_color = null;
 		}
 	}
@@ -211,7 +210,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		}
 
 		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+			Main.panel._centerBox.set_style(null);
 			this._camera_hint_prev_color = null;
 		}
 	}
