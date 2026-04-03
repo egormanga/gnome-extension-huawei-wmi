@@ -97,7 +97,7 @@ class CameraIndicator extends PanelMenu.Button {
 	}
 
 	show_hint(iconName = null) {
-    this.show_indicator({ bgColor: '#FF6B35', iconName: iconName });
+    this.show_indicator({ bgColor: '#00AAD0', iconName: iconName });
 	}
 
   show_warning(iconName = null) {
@@ -165,9 +165,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => this._update_fn_led() || true);
 
-		this._camera_hint_timeout = null;
-		this._camera_hint_prev_color = null;
-
 		this._bind_keys(settings);
 
 		this._update();
@@ -178,8 +175,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
 		if (this._fn_led_timeout !== null) GLib.Source.remove(this._fn_led_timeout);
-		if (this._camera_hint_timeout !== null) GLib.Source.remove(this._camera_hint_timeout);
-		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_style(null);
 
 		super.destroy();
 	}
@@ -247,21 +242,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_camera_ejected() {
 		this._show_osd(CAMERA_ICONS.EJECTED, _("Camera ejected"));
 
-		if (this._camera_hint_timeout === null) {
-			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
-			Main.panel._centerBox.set_style('background-color: #00AAD0;');
-
-			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, CAMERA_NOTIFICATION_DURATION, () => {
-				this._camera_hint_timeout = null;
-
-				if (this._camera_hint_prev_color !== null) {
-					Main.panel._centerBox.set_style(null);
-					this._camera_hint_prev_color = null;
-				}
-				return GLib.SOURCE_REMOVE;
-			});
-		}
-
 		if (this._camera_indicator) {
 			this._camera_indicator.show_hint(CAMERA_ICONS.EJECTED);
 		}
@@ -270,16 +250,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	_camera_inserted() {
 		this._show_osd(CAMERA_ICONS.INSERTED, _("Camera inserted"));
 
-		if (this._camera_hint_timeout !== null) {
-			GLib.Source.remove(this._camera_hint_timeout);
-			this._camera_hint_timeout = null;
-		}
-
-		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_style(null);
-			this._camera_hint_prev_color = null;
-		}
-
 		if (this._camera_indicator) {
 			this._camera_indicator.show_info(CAMERA_ICONS.INSERTED);
 		}
@@ -287,16 +257,6 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 	_camera_attached() {
 		this._show_osd(CAMERA_ICONS.ATTACHED, _("Camera attached"));
-
-		if (this._camera_hint_timeout !== null) {
-			GLib.Source.remove(this._camera_hint_timeout);
-			this._camera_hint_timeout = null;
-		}
-
-		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_style(null);
-			this._camera_hint_prev_color = null;
-		}
 
 		if (this._camera_indicator) {
 			this._camera_indicator.show_info(CAMERA_ICONS.ATTACHED);
