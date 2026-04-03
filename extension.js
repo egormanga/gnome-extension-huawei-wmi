@@ -31,6 +31,78 @@ class NonClosingPopupSwitchMenuItem extends PopupMenu.PopupSwitchMenuItem {
 	}
 });
 
+const CAMERA_NOTIFICATION_DURATION = 10;
+
+const CAMERA_ICONS = {
+    EJECTED: 'camera-photo-symbolic',
+    INSERTED: 'camera-hardware-disabled-symbolic',
+    ATTACHED: 'camera-photo-symbolic',
+    DETACHED: 'camera-hardware-disabled-symbolic',
+    DEFAULT: 'camera-photo-symbolic'
+};
+
+const CameraIndicator = GObject.registerClass(
+class CameraIndicator extends PanelMenu.Button {
+	_init() {
+		super._init(0.5, _("Camera"));
+
+		this._timeout = null;
+
+		let hbox = new St.BoxLayout({style_class: 'panel-status-menu-box'});
+		this.icon = new St.Icon({
+			icon_name: CAMERA_ICONS.DEFAULT,
+			style_class: 'system-status-icon',
+		});
+		hbox.add_child(this.icon);
+		this.add_child(hbox);
+
+		// Hide by default
+		this.hide();
+	}
+
+	destroy() {
+		if (this._timeout !== null) {
+			GLib.Source.remove(this._timeout);
+			this._timeout = null;
+		}
+		super.destroy();
+	}
+
+	show_indicator({ durationSeconds = CAMERA_NOTIFICATION_DURATION, color = null, iconName = null} = {}) {
+		if (iconName) {
+        this.icon.icon_name = iconName;
+    }
+
+		this.icon.set_style(color != null ? `color: ${color};` : null);
+
+		this.show();
+
+		if (this._timeout !== null) {
+			GLib.Source.remove(this._timeout);
+		}
+
+		this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, durationSeconds, () => {
+			this._timeout = null;
+			this.hide();
+			this.icon.set_style(null);
+			this.icon.icon_name = CAMERA_ICONS.DEFAULT;
+			return GLib.SOURCE_REMOVE;
+		});
+	}
+
+	show_info(iconName = null) {
+    this.show_indicator({ iconName: iconName });
+	}
+
+	show_hint(iconName = null) {
+    this.show_indicator({ color: '#00AAD0', iconName: iconName }); //
+	}
+
+  show_warning(iconName = null) {
+    this.show_indicator({ durationSeconds: 10, color: '#FF6B35', iconName: iconName });
+  }
+});
+
 const HuaweiWmiIndicator = GObject.registerClass(
 class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system battery menu?
 	_init(path, settings) {
@@ -39,6 +111,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._battery_watching = false;
 		this._topping_off = false;
 		this._fn_led = false;
+		this._camera_indicator = null;
 
 		this._file_sys_str = "/sys/devices/platform/huawei-wmi/charge_control_thresholds";
 		this._file_def_str = "/etc/default/huawei-wmi/charge_control_thresholds";
@@ -170,13 +243,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_camera_ejected() {
-		this._show_osd('camera-photo-symbolic', _("Camera ejected"));
+		this._show_osd(CAMERA_ICONS.EJECTED, _("Camera ejected"));
 
 		if (this._camera_hint_timeout === null) {
 			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
 			Main.panel._centerBox.set_style('background-color: #00AAD0;');
 
-			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
+			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, CAMERA_NOTIFICATION_DURATION, () => {
 				this._camera_hint_timeout = null;
 
 				if (this._camera_hint_prev_color !== null) {
@@ -186,10 +259,14 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 				return GLib.SOURCE_REMOVE;
 			});
 		}
+
+		if (this._camera_indicator) {
+			this._camera_indicator.show_info(CAMERA_ICONS.EJECTED);
+		}
 	}
 
 	_camera_inserted() {
-		this._show_osd('camera-hardware-disabled-symbolic', _("Camera inserted"));
+		this._show_osd(CAMERA_ICONS.INSERTED, _("Camera inserted"));
 
 		if (this._camera_hint_timeout !== null) {
 			GLib.Source.remove(this._camera_hint_timeout);
@@ -199,11 +276,15 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		if (this._camera_hint_prev_color !== null) {
 			Main.panel._centerBox.set_style(null);
 			this._camera_hint_prev_color = null;
+		}
+
+		if (this._camera_indicator) {
+			this._camera_indicator.show_info(CAMERA_ICONS.INSERTED);
 		}
 	}
 
 	_camera_attached() {
-		this._show_osd('camera-photo-symbolic', _("Camera attached"));
+		this._show_osd(CAMERA_ICONS.ATTACHED, _("Camera attached"));
 
 		if (this._camera_hint_timeout !== null) {
 			GLib.Source.remove(this._camera_hint_timeout);
@@ -214,10 +295,18 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 			Main.panel._centerBox.set_style(null);
 			this._camera_hint_prev_color = null;
 		}
+
+		if (this._camera_indicator) {
+			this._camera_indicator.show_info(CAMERA_ICONS.ATTACHED);
+		}
 	}
 
 	_camera_detached() {
-		this._show_osd('camera-hardware-disabled-symbolic', _("Camera detached"));
+		this._show_osd(CAMERA_ICONS.DETACHED, _("Camera detached"));
+
+		if (this._camera_indicator) {
+			this._camera_indicator.show_info(CAMERA_ICONS.DETACHED);
+		}
 	}
 
 	_update() {
@@ -395,13 +484,20 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 export default class HuaweiWmiExtension extends Extension {
 	enable() {
+	  this._camera_indicator = new CameraIndicator();
+	  Main.panel.addToStatusArea(this.uuid + '-camera', this._camera_indicator, -1, 'center');
+
 		this._indicator = new HuaweiWmiIndicator(this.path, this.getSettings());
+		this._indicator._camera_indicator = this._camera_indicator;
 		Main.panel.addToStatusArea(this.uuid, this._indicator);
 	}
 
 	disable() {
 		this._indicator.destroy();
 		this._indicator = null;
+
+		this._camera_indicator.destroy();
+		this._camera_indicator = null;
 	}
 }
 
