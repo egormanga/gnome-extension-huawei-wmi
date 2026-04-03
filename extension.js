@@ -44,19 +44,23 @@ const CAMERA_ICONS = {
 const CameraIndicator = GObject.registerClass(
 class CameraIndicator extends PanelMenu.Button {
 	_init() {
-		super._init(0.5, _("Camera"));
+		super._init(0.0, _("Camera"));
 
 		this._timeout = null;
 
-		let hbox = new St.BoxLayout({style_class: 'panel-status-menu-box'});
+		this.add_style_class_name('panel-button');
+
 		this.icon = new St.Icon({
 			icon_name: CAMERA_ICONS.DEFAULT,
 			style_class: 'system-status-icon',
 		});
-		hbox.add_child(this.icon);
-		this.add_child(hbox);
 
-		// Hide by default
+		this._icon_box = new St.BoxLayout({
+		  style_class: 'panel-status-menu-box',
+		});
+
+		this._icon_box.add_child(this.icon);
+		this.add_child(this._icon_box);
 		this.hide();
 	}
 
@@ -68,12 +72,10 @@ class CameraIndicator extends PanelMenu.Button {
 		super.destroy();
 	}
 
-	show_indicator({ durationSeconds = CAMERA_NOTIFICATION_DURATION, color = null, iconName = null} = {}) {
-		if (iconName) {
-        this.icon.icon_name = iconName;
-    }
-
-		this.icon.set_style(color != null ? `color: ${color};` : null);
+	show_indicator({ durationSeconds = CAMERA_NOTIFICATION_DURATION, bgColor = null, color = null, iconName = null} = {}) {
+		if (iconName) this.icon.icon_name = iconName;
+		this.icon.set_style(`color: ${color};`); // Alternative: set the style for the pill button (this.set_style), not the icon (this.icon.set_style). It will flow down into icon (and text). Useful, if text is added later to keep icon and text aligned
+		this.set_style(`background-color: ${bgColor};`)
 
 		this.show();
 
@@ -95,11 +97,11 @@ class CameraIndicator extends PanelMenu.Button {
 	}
 
 	show_hint(iconName = null) {
-    this.show_indicator({ color: '#00AAD0', iconName: iconName }); //
+    this.show_indicator({ bgColor: '#FF6B35', iconName: iconName });
 	}
 
   show_warning(iconName = null) {
-    this.show_indicator({ durationSeconds: 10, color: '#FF6B35', iconName: iconName });
+    this.show_indicator({ durationSeconds: 10, bgColor: '#FF6B35', iconName: iconName });
   }
 });
 
@@ -261,7 +263,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		}
 
 		if (this._camera_indicator) {
-			this._camera_indicator.show_info(CAMERA_ICONS.EJECTED);
+			this._camera_indicator.show_hint(CAMERA_ICONS.EJECTED);
 		}
 	}
 
@@ -305,7 +307,7 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		this._show_osd(CAMERA_ICONS.DETACHED, _("Camera detached"));
 
 		if (this._camera_indicator) {
-			this._camera_indicator.show_info(CAMERA_ICONS.DETACHED);
+			this._camera_indicator.show_hint(CAMERA_ICONS.DETACHED);
 		}
 	}
 
