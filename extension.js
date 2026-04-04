@@ -61,7 +61,9 @@ class CameraIndicator extends PanelMenu.Button {
 
 		this._icon_box.add_child(this.icon);
 		this.add_child(this._icon_box);
-		this.hide();
+
+		this.opacity = 0;
+    this.reactive = false;
 	}
 
 	destroy() {
@@ -80,16 +82,18 @@ class CameraIndicator extends PanelMenu.Button {
       transition-duration: 0ms;
     `);
 
-		this.show();
+		this.opacity = 255;
+    this.reactive = true;
 
-		if (this._timeout !== null) {
+        if (this._timeout !== null) {
 			GLib.Source.remove(this._timeout);
 		}
 
 		this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, durationSeconds, () => {
 			this._timeout = null;
-			this.hide();
-			this.icon.set_style(null);
+			this.opacity = 0;
+      this.reactive = false;
+ 			this.icon.set_style(null);
 			this.icon.icon_name = CAMERA_ICONS.DEFAULT;
 			return GLib.SOURCE_REMOVE;
 		});
