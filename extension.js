@@ -75,7 +75,10 @@ class CameraIndicator extends PanelMenu.Button {
 	show_indicator({ durationSeconds = CAMERA_NOTIFICATION_DURATION, bgColor = null, color = null, iconName = null} = {}) {
 		if (iconName) this.icon.icon_name = iconName;
 		this.icon.set_style(`color: ${color};`); // Alternative: set the style for the pill button (this.set_style), not the icon (this.icon.set_style). It will flow down into icon (and text). Useful, if text is added later to keep icon and text aligned
-		this.set_style(`background-color: ${bgColor};`)
+		this.set_style(`
+      background-color: ${bgColor};
+      transition-duration: 0ms;
+    `);
 
 		this.show();
 
