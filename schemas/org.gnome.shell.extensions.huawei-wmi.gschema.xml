@@ -30,5 +30,16 @@
 			<default><![CDATA[['XF86CameraAccessDisable']]]></default>
 			<summary></summary>
 		</key>
+
+		<key name="show-fn-lock-tile" type="b">
+			<default>true</default>
+			<summary>Show the Fn-Lock Quick Settings tile</summary>
+		</key>
+
+		<key name="show-battery-mode-tile" type="b">
+			<default>true</default>
+			<summary>Show the battery mode Quick Settings tile</summary>
+		</key>
+
 	</schema>
 </schemalist>
