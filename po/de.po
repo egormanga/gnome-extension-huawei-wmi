@@ -1,0 +1,51 @@
+msgid ""
+msgstr ""
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Home"
+msgstr "Zuhause"
+
+msgid "Work"
+msgstr "Arbeit"
+
+msgid "Travel"
+msgstr "Reise"
+
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+msgid "Custom"
+msgstr "Benutzerdefiniert"
+
+msgid "Battery mode"
+msgstr "Akkumodus"
+
+msgid "Fn-Lock"
+msgstr "Fn-Sperre"
+
+msgid "Top off battery"
+msgstr "Batterie vollständig laden"
+
+msgid "Power unlock"
+msgstr "Power-Unlock"
+
+msgid "Unavailable"
+msgstr "Nicht verfügbar"
+
+msgid "Quick Settings"
+msgstr "Schnelleinstellungen"
+
+msgid "Huawei WMI controls"
+msgstr "Huawei WMI-Steuerung"
+
+msgid "Choose which controls are available in Quick Settings."
+msgstr "Wähle aus, welche Steuerungen in den Schnelleinstellungen angezeigt werden."
+
+msgid "Fn-Lock tile"
+msgstr "Fn-Sperre-Kachel"
+
+msgid "Battery mode tile"
+msgstr "Akkumodus-Kachel"

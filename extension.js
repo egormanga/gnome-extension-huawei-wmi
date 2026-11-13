@@ -2,7 +2,6 @@
 
 import St from 'gi://St';
 import Gio from 'gi://Gio';
-import Cogl from 'gi://Cogl';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -13,6 +12,7 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
@@ -25,6 +25,14 @@ const BPM_PROFILES = {
 	"Disabled": [0, 100],
 };
 
+const BPM_ICON_NAMES = {
+	"Disabled": "battery-full-symbolic",
+	"Travel": "battery-good-symbolic",
+	"Work": "battery-medium-symbolic",
+	"Home": "battery-low-symbolic",
+    "Custom": "battery-symbolic",
+};
+
 const NonClosingPopupSwitchMenuItem = GObject.registerClass(
 class NonClosingPopupSwitchMenuItem extends PopupMenu.PopupSwitchMenuItem {
 	activate(event) {
@@ -32,86 +40,189 @@ class NonClosingPopupSwitchMenuItem extends PopupMenu.PopupSwitchMenuItem {
 	}
 });
 
-const HuaweiWmiIndicator = GObject.registerClass(
-class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system battery menu?
-	_init(path, settings) {
-		super._init(0.0, _("Huawei WMI controls"));
+const BLUE_GLOW_STYLE = `
+	background-color: transparent;
+	box-shadow: inset 0 8px 6px -4px rgba(0, 200, 255, 0.9);
+	border-radius: 0 0 99px 99px;
+	border: none;
+`;
 
+const BLUE_GLOW_BLINKING_INTERVAL = 1000;
+
+const CAMERA_NOTIFICATION_DURATION = 10;
+
+const CAMERA_ICONS = {
+	EJECTED: 'camera-photo-symbolic',
+	INSERTED: 'camera-hardware-disabled-symbolic',
+	ATTACHED: 'camera-photo-symbolic',
+	DETACHED: 'camera-hardware-disabled-symbolic',
+	DEFAULT: 'camera-photo-symbolic'
+};
+
+const COLOR_HIGHLIGHT = '#3D7FFF';
+const COLOR_WARNING = '#EB642A';
+const COLOR_HINT = '#828284';
+const COLOR_INFO = null;
+
+const CameraIndicator = GObject.registerClass(
+class CameraIndicator extends PanelMenu.Button {
+	_init() {
+		super._init(0.0, _("Camera"));
+
+		this._timeout = null;
+
+		this.add_style_class_name('panel-button');
+
+		this.icon = new St.Icon({
+			icon_name: CAMERA_ICONS.DEFAULT,
+			style_class: 'system-status-icon',
+		});
+
+		this._icon_box = new St.BoxLayout({
+			style_class: 'panel-status-menu-box',
+		});
+
+		this._icon_box.add_child(this.icon);
+		this.add_child(this._icon_box);
+
+		this.opacity = 0;
+		this.reactive = false;
+	}
+
+	destroy() {
+		if (this._timeout !== null) {
+			GLib.Source.remove(this._timeout);
+			this._timeout = null;
+		}
+		super.destroy();
+	}
+
+	show_indicator({ durationSeconds = CAMERA_NOTIFICATION_DURATION, bgColor = null, color = null, iconName = null} = {}) {
+		if (iconName) this.icon.icon_name = iconName;
+		this.set_style(`
+			background-color: ${bgColor};
+			color: ${color};
+			transition-duration: 0ms;
+		`);
+
+		this.opacity = 255;
+		this.reactive = true;
+
+		if (this._timeout !== null) {
+			GLib.Source.remove(this._timeout);
+		}
+
+		this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, durationSeconds, () => {
+			this._timeout = null;
+			this.opacity = 0;
+			this.reactive = false;
+			this.set_style(null);
+			this.icon.icon_name = CAMERA_ICONS.DEFAULT;
+			return GLib.SOURCE_REMOVE;
+		});
+	}
+
+	show_info(iconName = null) {
+		this.show_indicator({ iconName: iconName });
+	}
+
+	show_highlight(iconName = null) {
+		this.show_indicator({ bgColor: COLOR_HIGHLIGHT, iconName: iconName });
+	}
+
+	show_hint(iconName = null) {
+		this.show_indicator({ bgColor: COLOR_HINT, iconName: iconName });
+	}
+
+	show_warning(iconName = null) {
+		this.show_indicator({ durationSeconds: 10, bgColor: COLOR_WARNING, iconName: iconName });
+	}
+});
+
+const HuaweiWmiIndicator = GObject.registerClass(
+class HuaweiWmiIndicator extends QuickSettings.SystemIndicator {
+	_init(settings) {
+		super._init();
+
+		this._settings = settings;
 		this._battery_watching = false;
 		this._topping_off = false;
 		this._fn_led = false;
+		this._camera_indicator = null;
 
 		this._file_sys_str = "/sys/devices/platform/huawei-wmi/charge_control_thresholds";
 		this._file_def_str = "/etc/default/huawei-wmi/charge_control_thresholds";
 
-		this._icon_gear = Gio.icon_new_for_string(`${path}/gear-symbolic.svg`);
-		this._icon_gear_lock = Gio.icon_new_for_string(`${path}/gear-lock-symbolic.svg`);
-
-		let hbox = this._icon_box = new St.BoxLayout({style_class: 'panel-status-menu-box'}); {
-			let icon = this.icon = new St.Icon({
-				gicon: this._icon_gear,
-				style_class: 'system-status-icon',
-			});
-			hbox.add_child(icon);
-		}; this.add_child(hbox);
-
-		let bpm = this._bpm = new PopupMenu.PopupSubMenuMenuItem(this._BPM = _("Battery protection mode")); {
-			for (let name in BPM_PROFILES) {
-				let [low, high] = BPM_PROFILES[name];
-				let mi = new PopupMenu.PopupMenuItem(`${_(name)} (${low}%-${high}%)`); {
-					mi.connect('activate', () => this._set_bpm(low, high));;
-				}; bpm.menu.addMenuItem(mi);
-			}
-
-			// TODO: Custom
-		}; this.menu.addMenuItem(bpm);
-
-		let top_off = this._top_off = new NonClosingPopupSwitchMenuItem(_("Top off battery"), false); {
-			top_off.connect('toggled', (item, state) => this._set_top_off(state));
-		}; this.menu.addMenuItem(top_off);
-
-		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
-		let fn_lock = this._fn_lock = new NonClosingPopupSwitchMenuItem(_("Fn-Lock"), false); {
-			fn_lock.connect('toggled', (item, state) => this._set_fn_lock(state));
-		}; this.menu.addMenuItem(fn_lock);
-
-		let power_unlock = this._power_unlock = new NonClosingPopupSwitchMenuItem(_("Power unlock"), false); {
-			power_unlock.connect('toggled', (item, state) => this._set_power_unlock(state));
-		}; this.menu.addMenuItem(power_unlock);
-
-		this.connect('enter-event', () => this._update());
-		this.connect('button-press-event', () => this._update());
-		this.connect('key-press-event', () => this._update());
-		this.menu.connect('open-state-changed', () => {
-			if (this._bpm.sensitive) this._bpm.activate();
+		this._fn_toggle = new QuickSettings.QuickToggle({
+			title: _("Fn-Lock"),
+			iconName: 'preferences-desktop-keyboard-shortcuts-symbolic',
+			toggleMode: true,
 		});
+		this._fn_toggle.connect('clicked', () => this._set_fn_lock(this._fn_toggle.checked));
 
+		this._battery_toggle = new QuickSettings.QuickMenuToggle({
+			title: _("Battery mode"),
+			iconName: 'battery-symbolic',
+			menuEnabled: true,
+			toggleMode: true,
+		});
+		this._battery_toggle.gicon = this._get_bpm_icon("Disabled");
+		this._battery_toggle.connect('clicked', () => this._cycle_bpm());
+		this._battery_section = new PopupMenu.PopupMenuSection();
+		this._battery_toggle.menu.addMenuItem(this._battery_section);
+		this._bpm_items = new Map();
+		for (let name in BPM_PROFILES) {
+			let [low, high] = BPM_PROFILES[name];
+			let item = new PopupMenu.PopupImageMenuItem(
+				`${_(name)} (${low}%-${high}%)`,
+				this._get_bpm_icon(name));
+			item.connect('activate', () => this._set_bpm(low, high));
+			this._battery_section.addMenuItem(item);
+			this._bpm_items.set(name, item);
+		}
+
+		this._battery_section.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		this._top_off = new NonClosingPopupSwitchMenuItem(_("Top off battery"), false);
+		this._top_off.connect('toggled', (item, state) => this._set_top_off(state));
+		this._battery_section.addMenuItem(this._top_off);
+		this._power_unlock = new NonClosingPopupSwitchMenuItem(_("Power unlock"), false);
+		this._power_unlock.connect('toggled', (item, state) => this._set_power_unlock(state));
+		this._battery_section.addMenuItem(this._power_unlock);
+
+		this.quickSettingsItems.push(this._fn_toggle, this._battery_toggle);
 		this._fullscreen_changed_s = Display.connect('in-fullscreen-changed', this._fullscreen_changed.bind(this));
-
 		this._fn_led_timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 250, () => this._update_fn_led() || true);
-
 		this._camera_hint_timeout = null;
-		this._camera_hint_prev_color = null;
+		this._camera_glow_timer = null;
 
 		this._bind_keys(settings);
-
+		this._settings_changed_s = [];
+		for (let key of ['show-fn-lock-tile', 'show-battery-mode-tile']) {
+			if (this._has_setting(key))
+				this._settings_changed_s.push(settings.connect(`changed::${key}`, () => this._update_visibility()));
+		}
+		this._update_visibility();
 		this._update();
 	}
 
 	destroy() {
+		this.quickSettingsItems.forEach(item => item.destroy());
+		this.quickSettingsItems = [];
+
 		this._unbind_keys();
+		for (let id of this._settings_changed_s ?? []) this._settings.disconnect(id);
 
 		if (this._fullscreen_changed_s !== null) Display.disconnect(this._fullscreen_changed_s);
 		if (this._fn_led_timeout !== null) GLib.Source.remove(this._fn_led_timeout);
+		if (this._camera_glow_timer) GLib.Source.remove(this._camera_glow_timer);
 		if (this._camera_hint_timeout !== null) GLib.Source.remove(this._camera_hint_timeout);
-		if (this._camera_hint_prev_color !== null) Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
+		Main.panel._centerBox.set_style(null);
 
 		super.destroy();
 	}
 
 	_bind_keys(settings) {
-		Main.wm.addKeybinding('hwmi-config', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this.menu.toggle.bind(this.menu));
+		Main.wm.addKeybinding('hwmi-config', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, () => Main.panel.toggleQuickSettings());
 		Main.wm.addKeybinding('hwmi-power-unlock', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._key_power_unlock.bind(this));
 		Main.wm.addKeybinding('hwmi-camera-attached', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._camera_attached.bind(this));
 		Main.wm.addKeybinding('hwmi-camera-detached', settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, this._camera_detached.bind(this));
@@ -171,53 +282,111 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_camera_ejected() {
-		this._show_osd('camera-photo-symbolic', _("Camera ejected"));
+		this._show_osd(CAMERA_ICONS.EJECTED, _("Camera ejected"));
 
 		if (this._camera_hint_timeout === null) {
-			this._camera_hint_prev_color = Main.panel._centerBox.get_background_color();
-			Main.panel._centerBox.set_background_color(Cogl.color_from_string('#00AAD0')[1]);
+			let isGlowVisible = true;
+			Main.panel._centerBox.set_style(BLUE_GLOW_STYLE);
 
-			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
-				this._camera_hint_timeout = null;
+			this._camera_glow_timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, BLUE_GLOW_BLINKING_INTERVAL, () => {
+				isGlowVisible = !isGlowVisible;
+				Main.panel._centerBox.set_style(isGlowVisible ? BLUE_GLOW_STYLE : null);
+				return GLib.SOURCE_CONTINUE;
+			});
 
-				if (this._camera_hint_prev_color !== null) {
-					Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
-					this._camera_hint_prev_color = null;
+			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, CAMERA_NOTIFICATION_DURATION, () => {
+				if (this._camera_glow_timer) {
+					GLib.Source.remove(this._camera_glow_timer);
+					this._camera_glow_timer = null;
 				}
+				this._camera_hint_timeout = null;
+				Main.panel._centerBox.set_style(null);
+
+				this._camera_indicator?.show_warning(CAMERA_ICONS.EJECTED);
+				this._show_osd(CAMERA_ICONS.EJECTED, _("No Camera detected"));
+
+				return GLib.SOURCE_REMOVE;
+			});
+		}
+
+		this._camera_indicator?.show_info(CAMERA_ICONS.EJECTED);
+	}
+
+	_camera_inserted() {
+		this._show_osd(CAMERA_ICONS.INSERTED, _("Camera inserted"));
+
+		if (this._camera_hint_timeout !== null) {
+			GLib.Source.remove(this._camera_hint_timeout);
+			this._camera_hint_timeout = null;
+		}
+
+		if (this._camera_glow_timer) {
+			GLib.Source.remove(this._camera_glow_timer);
+			this._camera_glow_timer = null;
+		}
+
+		Main.panel._centerBox.set_style(null);
+
+		this._camera_indicator?.show_info(CAMERA_ICONS.INSERTED);
+	}
+
+	_camera_attached() {
+		this._show_osd(CAMERA_ICONS.ATTACHED, _("Camera attached"));
+
+		if (this._camera_hint_timeout !== null) {
+			GLib.Source.remove(this._camera_hint_timeout);
+			this._camera_hint_timeout = null;
+		}
+
+		if (this._camera_glow_timer) {
+			GLib.Source.remove(this._camera_glow_timer);
+			this._camera_glow_timer = null;
+		}
+
+		Main.panel._centerBox.set_style(null);
+
+		this._camera_indicator?.show_highlight(CAMERA_ICONS.ATTACHED);
+	}
+
+	_camera_detached() {
+		this._show_osd(CAMERA_ICONS.DETACHED, _("Camera detached"));
+
+		this._camera_indicator?.show_hint(CAMERA_ICONS.DETACHED);
+
+		if (this._camera_hint_timeout === null) {
+			this._camera_hint_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, CAMERA_NOTIFICATION_DURATION, () => {
+				this._camera_hint_timeout = null;
+				this._camera_indicator?.show_warning(CAMERA_ICONS.DETACHED);
+				this._show_osd(CAMERA_ICONS.DETACHED, _("No Camera detected"));
+				return GLib.SOURCE_REMOVE;
 			});
 		}
 	}
 
-	_camera_inserted() {
-		this._show_osd('camera-hardware-disabled-symbolic', _("Camera inserted"));
-
-		if (this._camera_hint_timeout !== null) {
-			GLib.Source.remove(this._camera_hint_timeout);
-			this._camera_hint_timeout = null;
-		}
-
-		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
-			this._camera_hint_prev_color = null;
-		}
+	_cycle_bpm() {
+		let current = this._current_bpm_name;
+		let names = Object.keys(BPM_PROFILES);
+		let next = names[(Math.max(0, names.indexOf(current)) + 1) % names.length];
+		let [low, high] = BPM_PROFILES[next];
+		this._set_bpm(low, high);
 	}
 
-	_camera_attached() {
-		this._show_osd('camera-photo-symbolic', _("Camera attached"));
-
-		if (this._camera_hint_timeout !== null) {
-			GLib.Source.remove(this._camera_hint_timeout);
-			this._camera_hint_timeout = null;
-		}
-
-		if (this._camera_hint_prev_color !== null) {
-			Main.panel._centerBox.set_background_color(this._camera_hint_prev_color);
-			this._camera_hint_prev_color = null;
-		}
+	_update_visibility() {
+		this._fn_toggle.visible = this._get_setting_boolean('show-fn-lock-tile');
+		this._battery_toggle.visible = this._get_setting_boolean('show-battery-mode-tile');
 	}
 
-	_camera_detached() {
-		this._show_osd('camera-hardware-disabled-symbolic', _("Camera detached"));
+	_has_setting(key) {
+		return this._settings.settings_schema.has_key(key);
+	}
+
+	_get_setting_boolean(key) {
+		return !this._has_setting(key) || this._settings.get_boolean(key);
+	}
+
+	_get_bpm_icon(mode) {
+		let iconName = BPM_ICON_NAMES[mode] ?? BPM_ICON_NAMES.Custom;
+		return Gio.ThemedIcon.new(iconName);
 	}
 
 	_update() {
@@ -240,8 +409,9 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 		if (on != this._fn_led) {
 			this._fn_led = on;
-			this.icon.set_gicon(on?this._icon_gear_lock:this._icon_gear);
-			this._show_osd('preferences-desktop-keyboard-shortcuts-symbolic', _(`Fn-Lock ${on?'on':'off'}`));
+			this._fn_toggle.icon_name = on ? 'preferences-desktop-keyboard-shortcuts-symbolic' : 'preferences-desktop-keyboard-shortcuts-symbolic';
+			this._fn_toggle.checked = Boolean(on);
+			this._show_osd('preferences-desktop-keyboard-shortcuts-symbolic', on ? _("Fn-Lock on") : _("Fn-Lock off"));
 		}
 	}
 
@@ -258,12 +428,19 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		try {
 			[low, high] = new TextDecoder().decode(_file_sys.load_contents(null)[1]).split(' ').map(Number);
 		} catch (e) {
-			this._bpm.setSensitive(false);
-			this._bpm.label.set_text(this._BPM);
+			this._battery_toggle.sensitive = false;
+			this._battery_toggle.subtitle = _("Unavailable");
 			return;
 		}
-		this._bpm.setSensitive(true);
-		this._bpm.label.set_text(this._BPM + `: ${low}%-${high}%`);
+		this._battery_toggle.sensitive = true;
+		let activeName = Object.entries(BPM_PROFILES).find(([, limits]) => limits[0] === low && limits[1] === high)?.[0] ?? 'Custom';
+		this._current_bpm_name = activeName;
+		this._battery_toggle.gicon = this._get_bpm_icon(activeName);
+		this._battery_toggle.subtitle = _(activeName);
+		this._battery_toggle.checked = activeName !== 'Disabled';
+		for (let [name, item] of this._bpm_items)
+			item.setOrnament(name === activeName ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE);
+
 	}
 
 	_update_top_off() {
@@ -303,12 +480,13 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 	}
 
 	_get_battery(callback) {
-		let menu = Main.panel.statusArea.aggregateMenu;
-		if (menu && menu._power) {
-			callback(menu._power._proxy, menu._power);
+		let system = Main.panel.statusArea.quickSettings?._system;
+		let powerToggle = system?._systemItem?.powerToggle;
+		let proxy = powerToggle?._proxy ?? system?._powerToggle?._proxy;
+		if (proxy) {
+			callback(proxy);
 		}
 	}
-
 	_set_top_off(state) {
 		let _file_sys = Gio.File.new_for_path(this._file_sys_str);
 		let _file_def = Gio.File.new_for_path(this._file_def_str);
@@ -367,11 +545,11 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 		try {
 			state = Boolean(Number(new TextDecoder().decode(file.load_contents(null)[1])));
 		} catch (e) {
-			this._fn_lock.setSensitive(false);
+			this._fn_toggle.sensitive = false;
 			return;
 		}
-		this._fn_lock.setSensitive(true);
-		this._fn_lock.setToggleState(state);
+		this._fn_toggle.sensitive = true;
+		this._fn_toggle.checked = state;
 	}
 
 	_set_power_unlock(state) {
@@ -395,13 +573,26 @@ class HuaweiWmiIndicator extends PanelMenu.Button { // TODO: move to system batt
 
 export default class HuaweiWmiExtension extends Extension {
 	enable() {
-		this._indicator = new HuaweiWmiIndicator(this.path, this.getSettings());
-		Main.panel.addToStatusArea(this.uuid, this._indicator);
+		this._camera_indicator = new CameraIndicator();
+		Main.panel.addToStatusArea(this.uuid + '-camera', this._camera_indicator, -1, 'center');
+
+		this._camera_indicator_dummy = new CameraIndicator();
+		Main.panel.addToStatusArea(this.uuid + '-camera-dummy', this._camera_indicator_dummy, 0, 'center');
+
+		this._indicator = new HuaweiWmiIndicator(this.getSettings());
+		this._indicator._camera_indicator = this._camera_indicator;
+		Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
 	}
 
 	disable() {
 		this._indicator.destroy();
 		this._indicator = null;
+
+		this._camera_indicator.destroy();
+		this._camera_indicator = null;
+
+		this._camera_indicator_dummy.destroy();
+		this._camera_indicator_dummy = null;
 	}
 }
 
